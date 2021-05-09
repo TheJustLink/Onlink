@@ -3,6 +3,9 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>netcoreapp3.1</TargetFramework>
+    <Authors>Link</Authors>
+    <Company>DevLink</Company>
+    <StartupObject>OnlinkServer.Program</StartupObject>
   </PropertyGroup>
 
 </Project>
