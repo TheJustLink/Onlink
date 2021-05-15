@@ -9,8 +9,10 @@ namespace OnlinkServer.Services
     {
         public bool IsRunning { get; private set; }
         public string Name => GetType().Name;
-
         public ILogger Logger = EmptyLogger.Instance;
+
+        public event Action Starting;
+        public event Action Stopping;
 
         private Thread _thread;
         private bool _isInterrupting;
@@ -20,13 +22,12 @@ namespace OnlinkServer.Services
             if (IsRunning) Stop();
 
             Logger.Log(Name + " starting...");
+            Starting?.Invoke();
 
             _thread = new Thread(ThreadLoop);
             _thread.IsBackground = true;
             _thread.Priority = ThreadPriority.Highest;
             _thread.Start();
-
-            Logger.Log(Name + " started");
         }
         public void Stop()
         {
@@ -34,6 +35,7 @@ namespace OnlinkServer.Services
                 return;
 
             Logger.Log(Name + " stopping...");
+            Stopping?.Invoke();
 
             _isInterrupting = true;
             _thread.Interrupt();
@@ -42,6 +44,7 @@ namespace OnlinkServer.Services
 
         private void ThreadLoop()
         {
+            Logger.Log(Name + " started");
             IsRunning = true;
 
             while (IsRunning && !_isInterrupting)

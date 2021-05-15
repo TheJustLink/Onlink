@@ -15,7 +15,8 @@ namespace OnlinkServer
             var servicePool = new ServicePool();
             servicePool.Logger = ConsoleLogger.Instance;
 
-            servicePool.AddServices(new RawService(), new TelegramService());
+            servicePool.AddService(new RawService(1337));
+            // servicePool.AddService(new TelegramService());
             servicePool.StartServices();
 
             HandleInput();
