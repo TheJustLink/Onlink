@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Threading;
 
-using OnlinkServer.Logs;
+using OnlinkServer.Logging;
 
 namespace OnlinkServer.Services
 {

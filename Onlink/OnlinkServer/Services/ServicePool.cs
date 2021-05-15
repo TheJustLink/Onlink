@@ -1,6 +1,6 @@
 ﻿using System.Collections.Generic;
 
-using OnlinkServer.Logs;
+using OnlinkServer.Logging;
 
 namespace OnlinkServer.Services
 {

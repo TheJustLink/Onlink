@@ -1,6 +1,6 @@
 ﻿using System;
 
-using OnlinkServer.Logs;
+using OnlinkServer.Logging;
 using OnlinkServer.Services;
 
 namespace OnlinkServer
