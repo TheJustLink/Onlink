@@ -1,12 +1,19 @@
-﻿using System.Net;
+﻿using System;
+using System.Net;
 using System.Net.Sockets;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+
+using OnlinkServer.Extensions;
 
 namespace OnlinkServer.Services
 {
     class RawService : Service
     {
+        public const int AcceptTickRate = 10;
+        public const int ClientTickRate = 1;
+
         public readonly IPAddress NetworkInterface;
         public readonly int Port;
 
@@ -36,12 +43,14 @@ namespace OnlinkServer.Services
 
         protected override void Handle()
         {
-            Logger.Log("Hi from " + Name);
-            Wait(3000);
-
             var hasConnection = TcpListener.Pending();
-            if (!hasConnection) return;
+            if (hasConnection)
+                ReceiveConnection();
 
+            Wait(AcceptTickRate);
+        }
+        private void ReceiveConnection()
+        {
             var client = TcpListener.AcceptTcpClient();
             Logger.Log("Connected - " + client.Client.RemoteEndPoint);
 
@@ -52,16 +61,42 @@ namespace OnlinkServer.Services
         {
             await Task.Run(() =>
             {
-                while (client.Connected && !CancellationTokenSource.Token.IsCancellationRequested)
-                    HandleClient(client);
+                var stream = client.GetStream();
+                var lastHandleTime = DateTime.Now;
+                var deltaTime = 0d;
+
+                while (IsRunning && client.GetConnectionState())
+                {
+                    if (CancellationTokenSource.IsCancellationRequested)
+                        break;
+
+                    deltaTime = (DateTime.Now - lastHandleTime).TotalSeconds;
+                    lastHandleTime = DateTime.Now;
+
+                    HandleClient(stream, deltaTime);
+
+                    Wait(ClientTickRate);
+                }
+
+                stream.Dispose();
+                client.Close();
 
                 Logger.Log("Client disconnected :/");
             }, CancellationTokenSource.Token);
         }
-        private void HandleClient(TcpClient client)
+
+        private double _elapsedTime;
+        private void HandleClient(NetworkStream stream, double deltaTime)
         {
-            Logger.Log("I AM NIGGA - " + client.Client.RemoteEndPoint);
-            Wait(3000);
+            _elapsedTime += deltaTime;
+
+            if (_elapsedTime < 3)
+                return;
+            else _elapsedTime = 0;
+
+            var buffer = Encoding.UTF8.GetBytes("Aboba");
+            stream.Write(buffer, 0, buffer.Length);
+            Logger.Log("<Msg sended>");
         }
     }
 }
