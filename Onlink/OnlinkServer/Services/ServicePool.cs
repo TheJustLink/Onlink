@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Threading;
 
 using OnlinkServer.Logging;
 
@@ -74,7 +75,8 @@ namespace OnlinkServer.Services
         }
         private void WaitServicesStarting()
         {
-            while (IsAllServicesRunned == false) { }
+            while (IsAllServicesRunned == false)
+                Thread.Sleep(10);
         }
 
         public void StopServices()
@@ -92,7 +94,8 @@ namespace OnlinkServer.Services
         }
         private void WaitServicesStopping()
         {
-            while (IsAllServicesStopped == false) { }
+            while (IsAllServicesStopped == false)
+                Thread.Sleep(10);
         }
     }
 }

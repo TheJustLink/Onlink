@@ -15,30 +15,32 @@ namespace OnlinkServer.Services
         public event Action Stopping;
 
         private Thread _thread;
-        private bool _isInterrupting;
+        private bool _isStopping;
+
+        public Service()
+        {
+            _thread = new Thread(ThreadLoop);
+            _thread.IsBackground = true;
+            _thread.Priority = ThreadPriority.Highest;
+        }
 
         public void Start()
         {
-            if (IsRunning) Stop();
+            if (IsRunning) return;
 
             Logger.Log(Name + " starting...");
             Starting?.Invoke();
 
-            _thread = new Thread(ThreadLoop);
-            _thread.IsBackground = true;
-            _thread.Priority = ThreadPriority.Highest;
             _thread.Start();
         }
         public void Stop()
         {
-            if (IsRunning == false)
-                return;
+            if (IsRunning == false) return;
 
             Logger.Log(Name + " stopping...");
             Stopping?.Invoke();
 
-            _isInterrupting = true;
-            _thread.Interrupt();
+            _isStopping = true;
         }
         ~Service() => Stop();
 
@@ -47,13 +49,12 @@ namespace OnlinkServer.Services
             Logger.Log(Name + " started");
             IsRunning = true;
 
-            while (IsRunning && !_isInterrupting)
+            while (IsRunning && !_isStopping)
             {
                 try
                 {
                     Handle();
                 }
-                catch (ThreadInterruptedException) { }
                 catch (Exception exception)
                 {
                     Logger.Exception(exception);
@@ -61,8 +62,7 @@ namespace OnlinkServer.Services
             }
 
             Logger.Log(Name + " stopped");
-
-            _isInterrupting = false;
+            _isStopping = false;
             IsRunning = false;
         }
 
