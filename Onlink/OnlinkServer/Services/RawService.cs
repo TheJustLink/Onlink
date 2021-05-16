@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -17,7 +18,11 @@ namespace OnlinkServer.Services
         public readonly IPAddress NetworkInterface;
         public readonly int Port;
 
+        private bool IsAllClientsClosed
+            => ClientHandlers.Count == 0;
+
         private readonly TcpListener TcpListener;
+        private readonly List<Task> ClientHandlers;
         private readonly CancellationTokenSource CancellationTokenSource;
 
         public RawService(int port) : this(IPAddress.Any, port) { }
@@ -27,18 +32,25 @@ namespace OnlinkServer.Services
             Port = port;
 
             TcpListener = new TcpListener(NetworkInterface, Port);
+            ClientHandlers = new List<Task>();
             CancellationTokenSource = new CancellationTokenSource();
-
-            Starting += OnStarting;
-            Stopping += OnStopping;
         }
 
-        private void OnStarting()
+        protected override void OnStart()
             => TcpListener.Start();
-        private void OnStopping()
+        protected override void OnStop()
+            => CloseClientHandlers();
+        private void CloseClientHandlers()
         {
             TcpListener.Stop();
             CancellationTokenSource.Cancel();
+
+            WaitCloseClientHandlers();
+        }
+        private void WaitCloseClientHandlers()
+        {
+            while (IsAllClientsClosed == false)
+                Wait(10);
         }
 
         protected override void Handle()
@@ -54,35 +66,43 @@ namespace OnlinkServer.Services
             var client = TcpListener.AcceptTcpClient();
             Logger.Log("Connected - " + client.Client.RemoteEndPoint);
 
-            HandleClientAsync(client);
+            var clientHandler = CreateClientHandler(client);
+            ClientHandlers.Add(clientHandler);
+
+            StartClientHandlerAsync(clientHandler);
         }
 
-        private async void HandleClientAsync(TcpClient client)
+        private async void StartClientHandlerAsync(Task handler)
         {
-            await Task.Run(() =>
+            await handler.ContinueWith((handler) => ClientHandlers.Remove(handler));
+        }
+        private Task CreateClientHandler(TcpClient client)
+        {
+            return Task.Run(() => HandleClient(client), CancellationTokenSource.Token);
+        }
+        private void HandleClient(TcpClient client)
+        {
+            var stream = client.GetStream();
+            var lastHandleTime = DateTime.Now;
+            var deltaTime = 0d;
+
+            while (IsRunning && client.GetConnectionState())
             {
-                var stream = client.GetStream();
-                var lastHandleTime = DateTime.Now;
-                var deltaTime = 0d;
+                if (CancellationTokenSource.IsCancellationRequested)
+                    break;
 
-                while (IsRunning && client.GetConnectionState())
-                {
-                    if (CancellationTokenSource.IsCancellationRequested)
-                        break;
+                deltaTime = (DateTime.Now - lastHandleTime).TotalSeconds;
+                lastHandleTime = DateTime.Now;
 
-                    deltaTime = (DateTime.Now - lastHandleTime).TotalSeconds;
-                    lastHandleTime = DateTime.Now;
+                HandleClient(stream, deltaTime);
 
-                    HandleClient(stream, deltaTime);
+                Wait(ClientTickRate);
+            }
 
-                    Wait(ClientTickRate);
-                }
+            stream.Dispose();
+            client.Close();
 
-                stream.Dispose();
-                client.Close();
-
-                Logger.Log("Client disconnected :/");
-            }, CancellationTokenSource.Token);
+            Logger.Log("Client disconnected :/");
         }
 
         private double _elapsedTime;

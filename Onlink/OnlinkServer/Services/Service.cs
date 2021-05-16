@@ -7,19 +7,33 @@ namespace OnlinkServer.Services
 {
     abstract class Service
     {
-        public bool IsRunning { get; private set; }
+        public bool IsRunning
+        {
+            get => _isRunning;
+            private set
+            {
+                if (value)
+                {
+                    Logger.Log(Name + " started");
+                }
+                else
+                {
+                    _isStopping = false;
+                    Logger.Log(Name + " stopped");
+                }
+                _isRunning = value;
+            }
+        }
         public string Name => GetType().Name;
         public ILogger Logger = EmptyLogger.Instance;
 
-        public event Action Starting;
-        public event Action Stopping;
-
         private Thread _thread;
+        private bool _isRunning;
         private bool _isStopping;
 
         public Service()
         {
-            _thread = new Thread(ThreadLoop);
+            _thread = new Thread(ThreadHandler);
             _thread.IsBackground = true;
             _thread.Priority = ThreadPriority.Highest;
         }
@@ -29,8 +43,6 @@ namespace OnlinkServer.Services
             if (IsRunning) return;
 
             Logger.Log(Name + " starting...");
-            Starting?.Invoke();
-
             _thread.Start();
         }
         public void Stop()
@@ -38,35 +50,41 @@ namespace OnlinkServer.Services
             if (IsRunning == false) return;
 
             Logger.Log(Name + " stopping...");
-            Stopping?.Invoke();
-
             _isStopping = true;
         }
         ~Service() => Stop();
 
-        private void ThreadLoop()
+        private void ThreadHandler()
         {
-            Logger.Log(Name + " started");
+            OnStart();
             IsRunning = true;
 
-            while (IsRunning && !_isStopping)
+            while (IsRunning)
             {
                 try
                 {
-                    Handle();
+                    ThreadLoopTick();
                 }
                 catch (Exception exception)
                 {
                     Logger.Exception(exception);
                 }
             }
-
-            Logger.Log(Name + " stopped");
-            _isStopping = false;
-            IsRunning = false;
+        }
+        private void ThreadLoopTick()
+        {
+            if (_isStopping)
+            {
+                OnStop();
+                IsRunning = false;
+            }
+            else Handle();
         }
 
+        protected abstract void OnStart();
         protected abstract void Handle();
+        protected abstract void OnStop();
+
         protected void Wait(int ms) => Thread.Sleep(ms);
     }
 }
